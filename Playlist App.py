@@ -71,7 +71,35 @@ def remove_song_from_playlist(song_title, playlist_name):
 
 def sort_playlist(playlist_name, sort_category):
     song_list = playlist_dictionary[playlist_name]
-    pass
+    if len(song_list) > 1:
+        mid = len(song_list) // 2
+        left = song_list[:mid]
+        right = song_list[mid:]
+
+        sort_playlist(left)
+        sort_playlist(right)
+
+        left_index = right_index = main_index = 0
+
+        while left_index < len(left) and right_index < len(right):
+            if left[left_index][sort_category] < right[right_index][sort_category]:
+                song_list[main_index] = left[left_index]
+                left_index += 1
+            else:
+                song_list[main_index] = right[right_index]
+                right_index += 1
+
+            main_index += 1
+
+        while left_index < len(left):
+            song_list[main_index] = left[left_index]
+            left_index += 1
+            main_index += 1
+            
+        while right_index < len(right):
+            song_list[main_index] = right[right_index]
+            right_index += 1
+            main_index += 1
 
 # Task 3: Building a Flask API for Playlist Access and Management:
 ## Song Engpoints
