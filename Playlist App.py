@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -14,30 +14,35 @@ def create_song(artist, album, title, genre):
                     'title': title,
                     'genre': genre
                 }
-    song_list.append(new_song)
-    return new_song
+    if new_song in song_list:
+        print("Song already exists!")
+    else:
+        song_list.append(new_song)
+        return new_song
 
 def update_song(artist, album, title, genre):
     song_to_update = get_song(title)
-    new_song = create_song(artist, album, title, genre)
-    for playlist, songList in playlist_dictionary.items():
-        for song in songList:
-            if song == song_to_update:
-                playlist_dictionary[playlist].append(new_song)
-    delete_song(song = song_to_update)
+    if song_to_update:
+        new_song = create_song(artist, album, title, genre)
+        if new_song:
+            for playlist, songList in playlist_dictionary.items():
+                for song in songList:
+                    if song == song_to_update:
+                        playlist_dictionary[playlist].append(new_song)
+            delete_song(song = song_to_update)
 
 def delete_song(**kwargs):
     song = kwargs.get("song", None)
     title = kwargs.get("title", None)
     if song:
-        if song in song_list:
-            song_list.remove(song)
-            for playlist in playlist_dictionary.values():
-                while song in playlist:
-                    playlist.remove(song)
+        song_list.remove(song)
+        for playlist in playlist_dictionary.values():
+            while song in playlist:
+                playlist.remove(song)
     elif title:
         song = get_song(title)
-        delete_song(song = song)
+        if song:
+            delete_song(song = song)
 
 def get_song(title):
     for song in song_list:
@@ -55,27 +60,36 @@ def create_playlist(name):
 
 def update_playlist(old_name, new_name):
     playlist_to_update, song_list = get_playlist(old_name)
-    playlist_dictionary[new_name] = song_list
-    delete_playlist(playlist_to_update)
+    if playlist_to_update:
+        playlist_dictionary[new_name] = song_list
+        delete_playlist(playlist_to_update)
 
 def get_playlist(name):
-    return name, playlist_dictionary[name]
+    if name in playlist_dictionary:
+        return name, playlist_dictionary[name]
+    else:
+        print(f"No playlist found with name of \"{name}\"")
 
 def delete_playlist(name):
     if name in playlist_dictionary:
         del playlist_dictionary[name]
+    else:
+        print(f"No playlist found with name of \"{name}\"")
 
 # Song/Playlist interactions
 def add_song_to_playlist(song_title, playlist_name):
     song_to_add = get_song(song_title)
     playlist = get_playlist(playlist_name)[1]
-    playlist.append(song_to_add)
-    playlist_dictionary[playlist_name] = playlist
-    print(f"{song_title} added to playlist: {playlist_name}")
+    if song_to_add and playlist:
+        playlist.append(song_to_add)
+        playlist_dictionary[playlist_name] = playlist
+        print(f"{song_title} added to playlist: {playlist_name}")
 
 def remove_song_from_playlist(song_title, playlist_name):
     song = get_song(song_title)
-    playlist_dictionary[playlist_name].remove(song)
+    playlist = get_playlist(playlist_name)[1]
+    if song and playlist:        
+        playlist_dictionary[playlist_name].remove(song)
 
 # Task 2: Efficient Search and Sort Algorithms for Playlist Navigation:
 
@@ -117,22 +131,23 @@ def sort_playlist(song_list, sort_category):
 @app.route('/songs', methods=['POST'])
 def createSong():
     data = request.get_json()
-    create_song(data['artist'], data['album'], data['title'], data['genre'])
+    song = create_song(data['artist'], data['album'], data['title'], data['genre'])
+    return jsonify(song)
 # Update Song
 @app.route('/songs', methods=['PUT'])
 def updateSong():
     data = request.get_json()
     update_song(data['artist'], data['album'], data['title'], data['genre'])
+    return jsonify({"success": "Song updated"})
 # Delete Song
-@app.route('/songs', methods=['DELETE'])
-def deleteSong():
-    data = request.get_json()
-    delete_song(song = create_song(data['artist'], data['album'], data['title'], data['genre']))
+@app.route('/songs/<string:title>', methods=['DELETE'])
+def deleteSong(title):
+    delete_song(title = title)
+    return jsonify({"success": "Song deleted"})
 # Seach/Get Song
-@app.route('/songs', methods=['GET'])
-def getSong():
-    data = request.get_json()
-    return jsonify(get_song(data['title']))
+@app.route('/songs/<string:title>', methods=['GET'])
+def getSong(title):
+    return jsonify(get_song(title))
 
 ## Playlist Endpoints
 # Create Playlist
@@ -140,21 +155,22 @@ def getSong():
 def sortPlaylist():
     data = request.get_json()
     create_playlist(data['name'])
+    return jsonify({"success": "Playlist created"})
 # Get Playlist
-@app.route('/playlists', methods=['Get'])
-def getPlaylist():
-    data = request.get_json()
-    return jsonify(get_playlist(data['name']))
+@app.route('/playlists/<string:name>', methods=['GET'])
+def getPlaylist(name):
+    return jsonify(get_playlist(name))
 # Update Playlist
 @app.route('/playlists/<string:playlist_name>', methods=['PUT'])
 def updatePlaylist(playlist_name):
     data = request.get_json()
     update_playlist(playlist_name, data['name'])
+    return jsonify({"success": "Playlist updated"})
 # Delete Playlist
-@app.route('/playlists', methods=['DELETE'])
-def deletePlaylist():
-    data = request.get_json()
-    delete_playlist(data['name'])
+@app.route('/playlists/<string:name>', methods=['DELETE'])
+def deletePlaylist(name):
+    delete_playlist(name)
+    return jsonify({"success": "Playlist deleted"})
 
 ## Additional Endpoints:
 # Add song to Playlist
@@ -163,17 +179,20 @@ def addToPlaylist(playlist_name):
     data = request.get_json()
     song_title = (data['song_title'])
     add_song_to_playlist(song_title, playlist_name)
+    return jsonify({"success": "Song added to Playlist"})
 # Remove song from Playlist
 @app.route('/playlists/<string:playlist_name>', methods=['DELETE'])
 def removeFromPlaylist(playlist_name):
     data = request.get_json()
     song_title = (data['song_title'])
     remove_song_from_playlist(song_title, playlist_name)
+    return jsonify({"success": "Song removed from Playlist"})
 # Sort songs in Playlist by song name, genre, and artist
 @app.route('/playlists/sort/<string:playlist_name>', methods=['PUT'])
 def sortSelectedPlaylist(playlist_name):
     data = request.get_json()
     sort_playlist(playlist_name, data['sort_category'])
+    return jsonify({"success": "Playlist sorted"})
 
 # Testing
 # Creating songs
